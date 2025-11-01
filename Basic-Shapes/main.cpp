@@ -15,17 +15,11 @@ GLfloat tetrahedron[4][3] = {  //AI
     {  0.4714f, -0.3333f,  0.8165f }, // base vertex 2
     {  0.4714f, -0.3333f, -0.8165f }  // base vertex 3
 };
-GLfloat colors[4][3] = {
-    {1.0f, 0.0f, 0.0f},  // red
-    {0.0f, 1.0f, 0.0f},  // green
-    {0.0f, 0.0f, 1.0f},  // blue
-    {1.0f, 1.0f, 0.0f}   // yellow
-};
 void drawTriangle();
 void drawCircle();
 void getBeizerPoints(float t,float& x,float& y);
 void drawBeizer();
-//void tetSetup();
+void tetSetup();
 void drawTetrahedron();
 void inputCircle();
 void display() {
@@ -46,9 +40,9 @@ int main(int argc, char **argv) {
     glutInitWindowSize(500, 500);
     glutCreateWindow("Shiny tetrahedron");
     glClearColor(0.1,0.1,0.1,1.0);
-    glEnable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION);
     gluPerspective(45.0, 1.0, 0.1, 100.0);
+    tetSetup();
     //gluOrtho2D(-10, 10, -10, 10); use for 2D visuals else looks flat and lighting goes wrong
     glutDisplayFunc(display);
     glutMainLoop();
@@ -130,28 +124,78 @@ void drawBeizer(){
     glEnd();
 }
 
-void drawTetrahedron() {
+
+void tetSetup(){   //took light normals,ambiences,matrices from AI
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_NORMALIZE);
+    glShadeModel(GL_SMOOTH);
+    glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
+
+    GLfloat lightPos[] = {2.0f, 2.0f, 2.0f, 1.0f};
+    GLfloat lightAmb[] = {0.2f, 0.2f, 0.2f, 1.0f};
+    GLfloat lightDiff[] = {0.8f, 0.8f, 0.8f, 1.0f};
+    GLfloat lightSpec[] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    glLightfv(GL_LIGHT0,GL_POSITION,lightPos);
+    glLightfv(GL_LIGHT0,GL_AMBIENT, lightAmb);
+    glLightfv(GL_LIGHT0,GL_DIFFUSE,lightDiff);
+    glLightfv(GL_LIGHT0,GL_SPECULAR,lightSpec);
+
+    GLfloat matAmb[] = {0.25f, 0.25f, 0.25f, 1.0f};
+    GLfloat matDiff[] = {0.4f,0.4f, 0.4f, 1.0f};
+    GLfloat matSpec[] = {0.774597f,0.774597f, 0.774597f, 1.0f};
+    GLfloat matShine[] = {76.8f};
+    glMaterialfv(GL_FRONT,GL_AMBIENT,matAmb);
+    glMaterialfv(GL_FRONT,GL_DIFFUSE,matDiff);
+    glMaterialfv(GL_FRONT,GL_SPECULAR,matSpec);
+    glMaterialfv(GL_FRONT,GL_SHININESS,matShine);
+}
+
+void computeNormal(GLfloat v1[3],GLfloat v2[3],GLfloat v3[3],GLfloat *nx,GLfloat *ny,GLfloat *nz){
+    GLfloat Ux= v2[0]-v1[0];
+    GLfloat Uy = v2[1]-v1[1];
+    GLfloat Uz = v2[2]-v1[2];
+    GLfloat Vx= v3[0]-v1[0];
+    GLfloat Vy= v3[1]-v1[1];
+    GLfloat Vz = v3[2]-v1[2];
+    *nx = Uy*Vz - Uz*Vy;
+    *ny = Uz*Vx - Ux*Vz;
+    *nz = Ux*Vy - Uy*Vx;
+}
+
+void drawTetrahedron(){
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    gluLookAt(0.0, 0.0, 4.0,   // camera position
-              0.0, 0.0, 0.0,   // look at origin
-              0.0, 1.0, 0.0);  // up direction
-
-    // Rotate continuously
-    glRotatef(angle, 0.0f, 1.0f, 0.0f);
-    angle += 0.25f;
-    GLuint faces[4][3] = {
-        {0, 1, 2},
-        {0, 2, 3},
-        {0, 3, 1},
-        {1, 3, 2}
+    gluLookAt(0.0,0.0,5.0,
+              0.0,0.0,0.0,
+              0.0,1.0,0.0);
+    glRotatef(angle,0.0,1.0,0.0); // rotation for dynamic shine
+    angle +=0.25f; // speed
+    GLuint tetraIndices[4][3] ={
+        {0,1,2},
+        {0,3,1},
+        {0,2,3},
+        {1,3,2}
     };
-    for (int i = 0; i < 4; i++) {
-        glColor3fv(colors[i]);   // assign a color per face
+
+    for(int i=0;i<4;i++){
+        GLfloat *v1 = tetrahedron[tetraIndices[i][0]];
+        GLfloat *v2 = tetrahedron[tetraIndices[i][1]];
+        GLfloat *v3 = tetrahedron[tetraIndices[i][2]];
+        GLfloat nx,ny,nz;
+        computeNormal(v1,v2,v3,&nx,&ny,&nz);
         glBegin(GL_TRIANGLES);
-            glVertex3fv(tetrahedron[faces[i][0]]);
-            glVertex3fv(tetrahedron[faces[i][1]]);
-            glVertex3fv(tetrahedron[faces[i][2]]);
+            glNormal3f(nx,ny,nz);
+            // Gradient silver tone per vertex
+            glColor3f(0.9,0.9,0.9);
+            glVertex3fv(v1);
+            glColor3f(0.8,0.8,0.8);
+            glVertex3fv(v2);
+            glColor3f(1.0,1.0,1.0);
+            glVertex3fv(v3);
         glEnd();
     }
 }
